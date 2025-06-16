@@ -6,9 +6,15 @@ class ModelCube(ToolIface):
     """
     A tool for creating a cube model with specified dimensions and coordinates.
     """
-    def __init__(self, name: str):
+    def __init__(self):
         description = "Create a cube model"
         parameters = {
+            "name": {
+                "type": "string",
+                "description": "Name of the cube model, incremented if already exists",
+                "default": "Cube_1",
+                "required": True
+            },
             "width": {
                 "type": "float",
                 "description": "Width of the cube",
@@ -26,11 +32,11 @@ class ModelCube(ToolIface):
                 "description": "Depth of the cube",
                 "default": 1.0,
                 "required": True
-            },
+            }
         }
-        super().__init__(name, description, parameters)
+        super().__init__("Cube", description, parameters, "model")
 
-    def call(self, width: float, height: float, depth: float) -> Model:
+    def call(self, name: str, width: float, height: float, depth: float) -> Model:
         box = [width, height, depth]
         extra = {
             "width": width,
@@ -38,7 +44,7 @@ class ModelCube(ToolIface):
             "depth": depth,
         }
         model = Model(
-            name=self.name,
+            name=name,
             description=self.description,
             type="cube",
             coord_x=0.0,

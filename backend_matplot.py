@@ -21,6 +21,22 @@ class BackendMatplot(BackendIface):
         :param operation: The operation to apply to the models.
         :return: List of transformed models.
         """
+        for o in operation:
+            if o.type == "transform_rigid":
+                # Apply rigid transformation to each model
+                for m in model:
+                    if m.name == o.models[0]:
+                        t = o.parameters.get("translation", [0.0, 0.0, 0.0])
+                        r = o.parameters.get("rotation", [0.0, 0.0, 0.0])
+                        s = o.parameters.get("scale", 1.0)
+                        m.coord_x += t[0]
+                        m.coord_y += t[1]
+                        m.coord_z += t[2]
+                        m.orientation_pitch += r[0]
+                        m.orientation_yaw += r[1]
+                        m.orientation_roll += r[2]
+                        m.box_size = [dim * s for dim in m.box_size]
+        # Return the transformed model
         return model  # No transformation in this backend
     
     def render(self, model: List[Model]) -> str:
@@ -43,29 +59,51 @@ class BackendMatplot(BackendIface):
 
             if m.type == "cube":
                 """
-                Render a cube model in 3D space.
+                Render a cube model in 3D space with orientation.
                 :param m: Model object containing cube data.
                 """
                 dx, dy, dz = m.box_size
+                print(f"Rendering cube at ({x}, {y}, {z}) with size ({dx}, {dy}, {dz}) and color {color}")
 
-                # Create a 3D cube
-                r = [0, 1]
-                X, Y = np.meshgrid(r, r)
-                ax.plot_surface(X * dx + x, Y * dy + y, np.zeros_like(X) + z, alpha=alpha, color=color)
-                ax.plot_surface(X * dx + x, Y * dy + y, np.ones_like(X) * (z + dz), alpha=alpha, color=color)
-                ax.plot_surface(X * dx + x, np.zeros_like(X) + y, Y * dy + z, alpha=alpha, color=color)
-                ax.plot_surface(X * dx + x, np.ones_like(X) * (y + dy), Y * dy + z, alpha=alpha, color=color)
-                ax.plot_surface(np.zeros_like(X) + x, X * dx + y, Y * dy + z, alpha=alpha, color=color)
-                ax.plot_surface(np.ones_like(X) * (x + dx), X * dx + y, Y * dy + z, alpha=alpha, color=color)
+                # Create a 3D cube using vertices centered at origin
+                vertices = np.array([
+                    [-dx/2, -dy/2, -dz/2], [dx/2, -dy/2, -dz/2], [dx/2, dy/2, -dz/2], [-dx/2, dy/2, -dz/2],  # bottom face
+                    [-dx/2, -dy/2, dz/2], [dx/2, -dy/2, dz/2], [dx/2, dy/2, dz/2], [-dx/2, dy/2, dz/2]  # top face
+                ])
+                
+                # Apply rotation transformations (pitch, yaw, roll)
+                pitch, yaw, roll = np.radians(m.orientation_pitch), np.radians(m.orientation_yaw), np.radians(m.orientation_roll)
+                
+                # Rotation matrices
+                Rx = np.array([[1, 0, 0], [0, np.cos(pitch), -np.sin(pitch)], [0, np.sin(pitch), np.cos(pitch)]])
+                Ry = np.array([[np.cos(yaw), 0, np.sin(yaw)], [0, 1, 0], [-np.sin(yaw), 0, np.cos(yaw)]])
+                Rz = np.array([[np.cos(roll), -np.sin(roll), 0], [np.sin(roll), np.cos(roll), 0], [0, 0, 1]])
+                
+                # Combined rotation matrix (order: Rz * Ry * Rx)
+                R = Rz @ Ry @ Rx
+                
+                # Apply rotation to vertices
+                rotated_vertices = vertices @ R.T
+                
+                # Translate to final position
+                final_vertices = rotated_vertices + np.array([x, y, z])
+                
+                # Define the 6 faces of the cube
+                faces = [
+                    [final_vertices[0], final_vertices[1], final_vertices[2], final_vertices[3]],  # bottom
+                    [final_vertices[4], final_vertices[5], final_vertices[6], final_vertices[7]],  # top
+                    [final_vertices[0], final_vertices[1], final_vertices[5], final_vertices[4]],  # front
+                    [final_vertices[2], final_vertices[3], final_vertices[7], final_vertices[6]],  # back
+                    [final_vertices[1], final_vertices[2], final_vertices[6], final_vertices[5]],  # right
+                    [final_vertices[0], final_vertices[3], final_vertices[7], final_vertices[4]]   # left
+                ]
+                
+                # Draw each face
+                from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+                ax.add_collection3d(Poly3DCollection(faces, alpha=alpha, facecolor=color, edgecolor='black'))
             else:
                 print(f"Model type '{m.type}' not supported for rendering in Matplotlib.")
-        plt.tight_layout()
-        plt.axis('off')
-        plt.grid(False)
-        plt.gca().set_box_aspect([1,1,1])
-        plt.tight_layout()
         plt.draw()
-        
         plt.show()
         return "Rendered 3D model with Matplotlib."
 
@@ -78,7 +116,7 @@ if __name__ == "__main__":
         coord_x=0.0,
         coord_y=0.0,
         coord_z=0.0,
-        box_size=[1.0, 1.0, 1.0],
+        box_size=[1.0, 2.0, 4.0],
         orientation_pitch=0.0,
         orientation_yaw=0.0,
         orientation_roll=0.0,

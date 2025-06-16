@@ -3,16 +3,18 @@ from if_model import Model
 
 # 定义一个通用工具类
 class ToolIface:
-    def __init__(self, name: str, description: str, parameters: dict):
+    def __init__(self, name: str, description: str, parameters: dict, tool_type: str = None):
         self.name = name
         self.description = description
         self.parameters = parameters
+        self.tool_type = tool_type if tool_type else "unknown"
     
     def to_dict(self):
         return {
             "name": self.name,
             "description": self.description,
-            "parameters": self.parameters
+            "parameters": self.parameters,
+            "tool_type": self.tool_type
         }
     
     def call(self, *args, **kwargs) -> Model:
@@ -23,4 +25,4 @@ class ToolIface:
         return json.dumps(self.to_dict(), indent=2)
 
     def __str__(self):
-        return f"ToolIface(name={self.name}, description={self.description}, parameters={self.parameters})"
+        return f"ToolIface(name={self.name}, description={self.description}, parameters={self.parameters}, tool_type={self.tool_type})"
