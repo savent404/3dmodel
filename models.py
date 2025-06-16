@@ -7,7 +7,7 @@ class ModelCube(ToolIface):
     A tool for creating a cube model with specified dimensions and coordinates.
     """
     def __init__(self):
-        description = "Create a cube model"
+        description = "Create a cube model, the cube is centered at (0,0,0) with specified width, height, and depth."
         parameters = {
             "name": {
                 "type": "string",
@@ -47,6 +47,63 @@ class ModelCube(ToolIface):
             name=name,
             description=self.description,
             type="cube",
+            coord_x=0.0,
+            coord_y=0.0,
+            coord_z=0.0,
+            box_size=box,
+            orientation_pitch=0.0,
+            orientation_yaw=0.0,
+            orientation_roll=0.0,
+            model_data=extra
+        )
+        return model
+
+class ModelCylinder(ToolIface):
+    """
+    A tool for creating a cylinder model with specified dimensions and coordinates.
+    """
+    def __init__(self):
+        description = "Create a cylinder model, the cylinder is centered at (0,0,0) with specified radius and height."
+        parameters = {
+            "name": {
+                "type": "string",
+                "description": "Name of the cylinder model, incremented if already exists",
+                "default": "Cylinder_1",
+                "required": True
+            },
+            "radius_x": {
+                "type": "float",
+                "description": "Radius of the cylinder",
+                "default": 1.0,
+                "required": True
+            },
+            "radius_y": {
+                "type": "float",
+                "description": "Radius of the cylinder (usually same as radius_x)",
+                "default": 1.0,
+                "required": True
+            },
+            "height": {
+                "type": "float",
+                "description": "Height of the cylinder",
+                "default": 1.0,
+                "required": True
+            }
+        }
+        super().__init__("Cylinder", description, parameters, "model")
+
+    def call(self, name: str, radius_x: float, radius_y: float, height: float) -> Model:
+
+        box = [radius_x * 2, radius_y * 2, height]
+        extra = {
+            "radius_x": radius_x,
+            "radius_y": radius_y,
+            "height": height,
+        }
+        model = Model(
+            name=name,
+            description=self.description,
+            type="cylinder",
             coord_x=0.0,
             coord_y=0.0,
             coord_z=0.0,

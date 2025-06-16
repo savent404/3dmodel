@@ -2,13 +2,15 @@ from ai_client import ChatMessage, ChatMessagePrompt, ChatGPTClient as Client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
 from typing import List, Dict
-from models import ModelCube
+from models import ModelCube, ModelCylinder
 from operations import ModelRigidTransform
 from backend_matplot import BackendMatplot as Backend
+import re
 
 def gen_tool():
     return [
         ModelCube(),
+        ModelCylinder(),
         ModelRigidTransform()
     ]
 
@@ -46,10 +48,12 @@ class Agent:
         import json
 
         # If the response contains ``` json....```, we need to extract the JSON part
-        if response.startswith('```json') and response.endswith('```'):
-            response = response[8:-3].strip()
-        elif response.startswith('```') and response.endswith('```'):
-            response = response[3:-3].strip()
+        json_regex = re.compile(r'```json\s*([\s\S]*?)```', re.IGNORECASE)
+        if json_regex.search(response):
+            response = json_regex.search(response).group(1).strip()
+        else:
+            # If no JSON block is found, we assume the response is already in JSON format
+            response = response.strip()
 
         try:
             data = json.loads(response)
@@ -84,7 +88,7 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent(tools=gen_tool())
-    user_input = "Create a cube with width 4.0, height 2.0, and depth 1.0. Then, move it to (1.0, 2.0, 3.0) and rotate it by (1.2, 0.5, 2.5)."
+    user_input = "创建一个(1,1,1)大小的正方体，并在其旁边创建一个(x轴半径为1,y轴半径为2,高度为1)大小的圆柱体"
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")
