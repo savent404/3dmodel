@@ -62,6 +62,4 @@ class TestModelRigidTransform(unittest.TestCase):
             "rotation": [0.1, 0.2, 0.3],
             # "scale" is missing
         }
-
         tool = ModelRigidTransform()
-        model

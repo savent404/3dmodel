@@ -15,9 +15,7 @@ The results should be a list of ChatMessage objects, each containing the followi
 3. tool_parameters: A dictionary containing the parameters used for the tool, if applicable.
 4. has_content: A boolean indicating whether the message contains tool related content or not.
 The tool_parameters field should contain the necessary parameters for the tool, which is specific to the tool being used.
-
-另外, 当用户使用相对位置关系描述时，尽可能的不要让模型产生碰撞，为了避免误差可以适当增加10%的距离。
-
+besides, when the user describes relative positions, try to avoid collisions as much as possible, and you can increase the distance by 10% to avoid errors.
 """
 
 @dataclass
@@ -31,8 +29,8 @@ class ChatGPTClient:
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.base_url = os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")
         self.model = os.getenv("OPENAI_API_MODEL", "gpt-4o-mini")
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", 1000))
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
+        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", 4000))
+        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.8))
         self.history_depth = int(os.getenv("OPENAI_HISTORY_DEPTH", 10))
         self.system_prompt = system_prompt
 

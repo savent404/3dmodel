@@ -88,11 +88,29 @@ class ModelCylinder(ToolIface):
                 "description": "Height of the cylinder",
                 "default": 1.0,
                 "required": True
-            }
+            },
+            "coord_x": {
+                "type": "float",
+                "description": "X coordinate of the cylinder center",
+                "default": 0.0,
+                "required": False
+            },
+            "coord_y": {
+                "type": "float",
+                "description": "Y coordinate of the cylinder center",
+                "default": 0.0,
+                "required": False
+            },
+            "coord_z": {
+                "type": "float",
+                "description": "Z coordinate of the cylinder center",
+                "default": 0.0,
+                "required": False
+            },
         }
         super().__init__("Cylinder", description, parameters, "model")
 
-    def call(self, name: str, radius_x: float, radius_y: float, height: float) -> Model:
+    def call(self, name: str, radius_x: float, radius_y: float, height: float, coord_x: float = 0, coord_y: float = 0, coord_z: float = 0) -> Model:
 
         box = [radius_x * 2, radius_y * 2, height]
         extra = {
@@ -104,9 +122,9 @@ class ModelCylinder(ToolIface):
             name=name,
             description=self.description,
             type="cylinder",
-            coord_x=0.0,
-            coord_y=0.0,
-            coord_z=0.0,
+            coord_x=coord_x,
+            coord_y=coord_y,
+            coord_z=coord_z,
             box_size=box,
             orientation_pitch=0.0,
             orientation_yaw=0.0,

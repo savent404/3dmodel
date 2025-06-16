@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 import random
 from matplotlib.colors import CSS4_COLORS as colors
 from matplotlib.patches import Polygon
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
 class BackendMatplot(BackendIface):
@@ -100,7 +101,6 @@ class BackendMatplot(BackendIface):
                 ]
                 
                 # Draw each face
-                from mpl_toolkits.mplot3d.art3d import Poly3DCollection
                 ax.add_collection3d(Poly3DCollection(faces, alpha=alpha, facecolor=color, edgecolor='black'))
             elif m.type == "cylinder":
                 """

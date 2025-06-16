@@ -5,7 +5,8 @@ from typing import List, Dict
 from models import ModelCube, ModelCylinder, ModelHalfCylinder
 from operations import ModelRigidTransform
 from backend_matplot import BackendMatplot as Backend
-import re
+import re, os
+import hashlib
 
 def gen_tool():
     return [
@@ -22,7 +23,7 @@ class Agent:
         self.history = []
 
         # Build system prompt
-        self.system_prompt = "You are an AI agent that can create 3D models using the following tools:\n"
+        self.system_prompt = "You are an aircraft design expert who can use various tools to create and manipulate models. You can use the following tools to create models or perform operations:\n"
         for tool in self.tools:
             item = f'- {tool.name}: {tool.to_json()}\n'
             self.system_prompt += item
@@ -36,9 +37,20 @@ class Agent:
         # Create a chat message with the system prompt
         messages = user_input.strip()
 
-        # Send the request to the AI client
-        response = self.client.chat(messages, self.history)
+        # Create cache filename based on user input hash
+        cache_key = hashlib.md5(user_input.encode('utf-8')).hexdigest()
+        cache_file = f'.cache_{cache_key}'
 
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r') as f:
+                response = f.read()
+        else:
+            # Send the request to the AI client
+            response = self.client.chat(messages, self.history)
+
+            # cache response to cache file
+            with open(cache_file, 'w') as f:
+                f.write(response)
         # Parse the response to extract model operations
         return self.handle_chat_response(response)
 
@@ -89,7 +101,7 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent(tools=gen_tool())
-    user_input = "创建一个1边长的正方体，在其左边创建一个半径为1，高度为1的圆柱体，并在其右边创建一个半径为1，高度为1的半圆柱体, 每个模块至少间隔2个单位。"
+    user_input = "使用5个扁平的圆柱体(height=0.1)模拟机翼的支撑零件，每个圆柱体从上到下平行排列(根据经验设置合理的间隔具体)"
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")
