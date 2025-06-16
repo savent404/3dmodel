@@ -115,6 +115,63 @@ class ModelCylinder(ToolIface):
         )
         return model
 
+class ModelHalfCylinder(ToolIface):
+    """
+    A tool for creating a half cylinder model with specified dimensions and coordinates, 在y轴上对称, 正视图为矩形
+    """
+    def __init__(self):
+        description = "Create a half cylinder model, the half cylinder is centered at (0,0,0) with specified radius and height (y轴对称). 正视图为矩形."
+        parameters = {
+            "name": {
+                "type": "string",
+                "description": "Name of the half cylinder model, incremented if already exists",
+                "default": "HalfCylinder_1",
+                "required": True
+            },
+            "radius_x": {
+                "type": "float",
+                "description": "Radius of the half cylinder",
+                "default": 1.0,
+                "required": True
+            },
+            "radius_y": {
+                "type": "float",
+                "description": "Radius of the half cylinder (usually same as radius_x)",
+                "default": 1.0,
+                "required": True
+            },
+            "height": {
+                "type": "float",
+                "description": "Height of the half cylinder",
+                "default": 1.0,
+                "required": True
+            }
+        }
+        super().__init__("HalfCylinder", description, parameters, "model")
+
+    def call(self, name: str, radius_x: float, radius_y: float, height: float) -> Model:
+
+        box = [radius_x * 2, radius_y * 2, height]
+        extra = {
+            "radius_x": radius_x,
+            "radius_y": radius_y,
+            "height": height,
+        }
+        model = Model(
+            name=name,
+            description=self.description,
+            type="half cylinder",
+            coord_x=0.0,
+            coord_y=0.0,
+            coord_z=0.0,
+            box_size=box,
+            orientation_pitch=0.0,
+            orientation_yaw=0.0,
+            orientation_roll=0.0,
+            model_data=extra
+        )
+        return model
+
 import unittest
 
 class TestModelCube(unittest.TestCase):

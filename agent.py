@@ -2,7 +2,7 @@ from ai_client import ChatMessage, ChatMessagePrompt, ChatGPTClient as Client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
 from typing import List, Dict
-from models import ModelCube, ModelCylinder
+from models import ModelCube, ModelCylinder, ModelHalfCylinder
 from operations import ModelRigidTransform
 from backend_matplot import BackendMatplot as Backend
 import re
@@ -11,7 +11,8 @@ def gen_tool():
     return [
         ModelCube(),
         ModelCylinder(),
-        ModelRigidTransform()
+        ModelHalfCylinder(),
+        ModelRigidTransform(),
     ]
 
 class Agent:
@@ -88,7 +89,7 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent(tools=gen_tool())
-    user_input = "创建一个(1,1,1)大小的正方体，并在其旁边创建一个(x轴半径为1,y轴半径为2,高度为1)大小的圆柱体"
+    user_input = "创建一个1边长的正方体，在其左边创建一个半径为1，高度为1的圆柱体，并在其右边创建一个半径为1，高度为1的半圆柱体, 每个模块至少间隔2个单位。"
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")

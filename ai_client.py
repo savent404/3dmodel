@@ -15,6 +15,9 @@ The results should be a list of ChatMessage objects, each containing the followi
 3. tool_parameters: A dictionary containing the parameters used for the tool, if applicable.
 4. has_content: A boolean indicating whether the message contains tool related content or not.
 The tool_parameters field should contain the necessary parameters for the tool, which is specific to the tool being used.
+
+另外, 当用户使用相对位置关系描述时，尽可能的不要让模型产生碰撞，为了避免误差可以适当增加10%的距离。
+
 """
 
 @dataclass
