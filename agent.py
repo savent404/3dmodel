@@ -2,9 +2,9 @@ from ai_client import ChatMessage, ChatMessagePrompt, ChatGPTClient as Client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
 from typing import List, Dict
-from models import ModelCube, ModelCylinder, ModelHalfCylinder
+from models import ModelCube, ModelCylinder, ModelHalfCylinder, ModelNACA4
 from operations import ModelRigidTransform
-from backend_matplot import BackendMatplot as Backend
+from backend_trimesh import BackendTrimesh as Backend
 import re, os
 import hashlib
 
@@ -13,6 +13,7 @@ def gen_tool():
         ModelCube(),
         ModelCylinder(),
         ModelHalfCylinder(),
+        ModelNACA4(),
         ModelRigidTransform(),
     ]
 
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")
-    backend = Backend("matplot")
+    backend = Backend("trimesh")
     transformed_models = backend.transform(models, ops)
     print(f"Transformed Models: {[model.to_json() for model in transformed_models]}")
     backend.render(transformed_models)

@@ -190,6 +190,181 @@ class ModelHalfCylinder(ToolIface):
         )
         return model
 
+class ModelNACA4(ToolIface):
+    """
+    A tool for creating a NACA 4-digit airfoil model for wing design.
+    Creates a thin airfoil section that can be used to build wing structures.
+    """
+    def __init__(self):
+        description = "Create a NACA 4-digit airfoil model, useful for wing design. The airfoil is a thin sheet with NACA profile."
+        parameters = {
+            "name": {
+                "type": "string",
+                "description": "Name of the NACA airfoil model",
+                "default": "NACA_0012",
+                "required": True
+            },
+            "naca_digits": {
+                "type": "string",
+                "description": "4-digit NACA designation (e.g., '0012', '2412', '4412')",
+                "default": "0012",
+                "required": True
+            },
+            "chord_length": {
+                "type": "float",
+                "description": "Chord length of the airfoil",
+                "default": 1.0,
+                "required": True
+            },
+            "thickness": {
+                "type": "float",
+                "description": "Thickness of the airfoil sheet",
+                "default": 0.01,
+                "required": True
+            },
+            "resolution": {
+                "type": "integer",
+                "description": "Number of points to define the airfoil curve (higher = smoother)",
+                "default": 50,
+                "required": False
+            },
+            "coord_x": {
+                "type": "float",
+                "description": "X coordinate of the airfoil center",
+                "default": 0.0,
+                "required": False
+            },
+            "coord_y": {
+                "type": "float",
+                "description": "Y coordinate of the airfoil center",
+                "default": 0.0,
+                "required": False
+            },
+            "coord_z": {
+                "type": "float",
+                "description": "Z coordinate of the airfoil center",
+                "default": 0.0,
+                "required": False
+            }
+        }
+        super().__init__("NACA4", description, parameters, "model")
+
+    def call(self, name: str, naca_digits: str, chord_length: float, thickness: float, 
+             resolution: int = 50, coord_x: float = 0.0, coord_y: float = 0.0, coord_z: float = 0.0) -> Model:
+        """
+        Create a NACA 4-digit airfoil model.
+        
+        Args:
+            name: Name of the model
+            naca_digits: 4-digit NACA designation (e.g., '0012')
+            chord_length: Chord length of the airfoil
+            thickness: Thickness of the airfoil sheet
+            resolution: Number of points for airfoil curve
+            coord_x, coord_y, coord_z: Position coordinates
+        """
+        
+        # Validate NACA digits
+        if len(naca_digits) != 4 or not naca_digits.isdigit():
+            raise ValueError("NACA digits must be a 4-digit string (e.g., '0012')")
+        
+        # Parse NACA parameters
+        m = int(naca_digits[0]) / 100.0  # Maximum camber as fraction of chord
+        p = int(naca_digits[1]) / 10.0   # Position of maximum camber as fraction of chord
+        t = int(naca_digits[2:4]) / 100.0  # Maximum thickness as fraction of chord
+        
+        # Calculate bounding box
+        box = [chord_length, thickness, chord_length * t * 2]  # Approximate dimensions
+        
+        extra = {
+            "naca_digits": naca_digits,
+            "chord_length": chord_length,
+            "sheet_thickness": thickness,
+            "resolution": resolution,
+            "max_camber": m,
+            "max_camber_position": p,
+            "thickness_ratio": t,
+            "airfoil_type": "naca4"
+        }
+        
+        model = Model(
+            name=name,
+            description=self.description,
+            type="naca4",
+            coord_x=coord_x,
+            coord_y=coord_y,
+            coord_z=coord_z,
+            box_size=box,
+            orientation_pitch=0.0,
+            orientation_yaw=0.0,
+            orientation_roll=0.0,
+            model_data=extra
+        )
+        return model
+
+    @staticmethod
+    def generate_naca4_coordinates(naca_digits: str, chord_length: float = 1.0, resolution: int = 50):
+        """
+        Generate NACA 4-digit airfoil coordinates.
+        
+        Args:
+            naca_digits: 4-digit NACA designation
+            chord_length: Chord length
+            resolution: Number of points
+            
+        Returns:
+            tuple: (x_coords, y_upper, y_lower) arrays
+        """
+        import numpy as np
+        
+        # Parse NACA parameters
+        m = int(naca_digits[0]) / 100.0  # Maximum camber
+        p = int(naca_digits[1]) / 10.0   # Position of maximum camber
+        t = int(naca_digits[2:4]) / 100.0  # Maximum thickness
+        
+        # Generate x coordinates (cosine spacing for better leading/trailing edge resolution)
+        beta = np.linspace(0, np.pi, resolution)
+        x = chord_length * (1 - np.cos(beta)) / 2
+        
+        # Thickness distribution (symmetric airfoil)
+        yt = 5 * t * chord_length * (
+            0.2969 * np.sqrt(x / chord_length) - 
+            0.1260 * (x / chord_length) - 
+            0.3516 * (x / chord_length)**2 + 
+            0.2843 * (x / chord_length)**3 - 
+            0.1015 * (x / chord_length)**4
+        )
+        
+        # Camber line
+        if m == 0 or p == 0:
+            # Symmetric airfoil
+            yc = np.zeros_like(x)
+            dyc_dx = np.zeros_like(x)
+        else:
+            # Cambered airfoil
+            yc = np.zeros_like(x)
+            dyc_dx = np.zeros_like(x)
+            
+            # Forward of maximum camber
+            mask1 = x <= p * chord_length
+            yc[mask1] = m * chord_length * (2 * p * x[mask1] / chord_length - (x[mask1] / chord_length)**2) / p**2
+            dyc_dx[mask1] = 2 * m * (p - x[mask1] / chord_length) / p**2
+            
+            # Aft of maximum camber
+            mask2 = x > p * chord_length
+            yc[mask2] = m * chord_length * ((1 - 2*p) + 2*p*x[mask2]/chord_length - (x[mask2]/chord_length)**2) / (1-p)**2
+            dyc_dx[mask2] = 2 * m * (p - x[mask2] / chord_length) / (1-p)**2
+        
+        # Calculate angle
+        theta = np.arctan(dyc_dx)
+        
+        # Upper and lower surface coordinates
+        x_upper = x - yt * np.sin(theta)
+        y_upper = yc + yt * np.cos(theta)
+        x_lower = x + yt * np.sin(theta)
+        y_lower = yc - yt * np.cos(theta)
+        
+        return x, x_upper, y_upper, x_lower, y_lower
+
 import unittest
 
 class TestModelCube(unittest.TestCase):
