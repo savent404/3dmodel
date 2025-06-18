@@ -1,11 +1,11 @@
-from ai_client import ChatMessage, ChatMessagePrompt, ChatGPTClient as Client
+from ai_client import ChatMessage, ChatMessagePrompt, get_ai_client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
 from typing import List, Dict
 from models import ModelCube, ModelCylinder, ModelHalfCylinder, ModelNACA4
 from operations import ModelRigidTransform
 from backend_trimesh import BackendTrimesh as Backend
-import re, os
+import re, os, json
 import hashlib
 
 def gen_tool():
@@ -20,7 +20,7 @@ def gen_tool():
 class Agent:
     def __init__(self, tools: List[ToolIface]):
         self.tools = tools
-        self.client = Client()
+        self.client = get_ai_client()
         self.history = []
 
         # Build system prompt
@@ -43,9 +43,11 @@ class Agent:
         cache_file = f'.cache_{cache_key}'
 
         if os.path.exists(cache_file):
+            print(f"cache mathced: {cache_file}")
             with open(cache_file, 'r') as f:
                 response = f.read()
         else:
+            print(f"cache not found, sending request to AI client...")
             # Send the request to the AI client
             response = self.client.chat(messages, self.history)
 
@@ -54,24 +56,63 @@ class Agent:
                 f.write(response)
         # Parse the response to extract model operations
         return self.handle_chat_response(response)
+    
+    def parse_json(self, response: str):
+        import json
+        response = response.strip()
+
+        # remove // comments
+        response = re.sub(r'//.*?\n', '', response)
+        # If the response contains ``` json....```, we need to extract the JSON part
+
+        try:
+            data = json.loads(response)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON response: {e}")
+            print(f"Raw response: {response}")
+            return None
+        return data
 
     def handle_chat_response(self, response: str):
         # This method should parse the response from the AI client
         # and return a list of Model objects based on the operations specified.
         # For simplicity, we will assume the response is a JSON string containing model data.
-        import json
 
         # If the response contains ``` json....```, we need to extract the JSON part
         json_regex = re.compile(r'```json\s*([\s\S]*?)```', re.IGNORECASE)
-        if json_regex.search(response):
-            response = json_regex.search(response).group(1).strip()
-        else:
+
+        # case 1: non json block
+        if not json_regex.search(response):
             # If no JSON block is found, we assume the response is already in JSON format
             response = response.strip()
+            data = self.parse_json(response)
+        elif json_regex.search(response):
+            count = len(json_regex.findall(response))
 
+            if count == 1:
+                print("Found a single JSON block in the response.")
+                response = json_regex.search(response).group(1).strip()
+                data = self.parse_json(response)
+                data = [data] if isinstance(data, dict) else data
+            else:
+                print(f"Found {count} JSON blocks in the response, extracting the first one.")
+                data = []
+                for match in json_regex.finditer(response):
+                    json_block = match.group(1).strip()
+                    try:
+                        d = self.parse_json(json_block)
+                        #if json begin with array, we assume it's a list of models
+                        if isinstance(d, list):
+                            # Append each item in the list to the response
+                            for item in d:
+                                data.append(item)
+                        else:
+                            # Otherwise, append the single item
+                            data.append(d)
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing JSON block: {e}")
+                        print(f"Raw block: {json_block}")
         try:
-            data = json.loads(response)
-
             print(f"Parsed response: {data}")
             for item in data:
                 # find tool by name
@@ -102,7 +143,7 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent(tools=gen_tool())
-    user_input = "使用5个扁平的圆柱体(height=0.1)模拟机翼的支撑零件，每个圆柱体从上到下平行排列(根据经验设置合理的间隔具体)"
+    user_input = "使用5个airfoil模拟机翼的支撑零件，根据合理的间隔和角度设置每个airfoil的坐标和方向, 并将它们组合成一个整体模型(通过细长的圆柱体贯穿每个airfoil的中心，圆柱体的直径为0.05)"
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")

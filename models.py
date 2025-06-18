@@ -196,7 +196,10 @@ class ModelNACA4(ToolIface):
     Creates a thin airfoil section that can be used to build wing structures.
     """
     def __init__(self):
-        description = "Create a NACA 4-digit airfoil model, useful for wing design. The airfoil is a thin sheet with NACA profile."
+        description = """
+Create a NACA 4-digit airfoil model, useful for wing design. The airfoil is a thin sheet with NACA profile.
+As default, chord direction: X-axis (airfoil points along X-axis), span direction: Y-axis (stackable along Y-axis),  Thickness direction: Z-axis (airfoil thickness along Z-axis), Section normal: Y-axis direction.
+"""
         parameters = {
             "name": {
                 "type": "string",
