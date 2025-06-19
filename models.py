@@ -1,15 +1,57 @@
 from if_tool import ToolIface
 from if_model import Model
-from model_orientation_config import get_orientation_description, get_model_orientation
+
+# Global coordinate system definitions
+COORDINATE_SYSTEM = {
+    "x_axis": {
+        "name": "Primary/Length/Chord",
+        "description": "Main dimension of the object (e.g., chord direction for airfoils, length for boxes)",
+        "typical_use": "Airfoil chord direction, box length, cylinder axis"
+    },
+    "y_axis": {
+        "name": "Secondary/Width/Span", 
+        "description": "Secondary dimension (e.g., span direction for wings, width for boxes)",
+        "typical_use": "Wing span direction, box width, stackable dimension"
+    },
+    "z_axis": {
+        "name": "Height/Thickness/Vertical",
+        "description": "Height or thickness dimension (e.g., airfoil thickness, box height)",
+        "typical_use": "Airfoil thickness direction, box height, vertical dimension"
+    }
+}
+
+def get_coordinate_system_description() -> str:
+    """Get the standard coordinate system description."""
+    return """Standard coordinate system used throughout the system:
+- X-axis: Primary/Length/Chord direction
+- Y-axis: Secondary/Width/Span direction  
+- Z-axis: Height/Thickness/Vertical direction"""
 
 
 class ModelCube(ToolIface):
     """
     A tool for creating a cube model with specified dimensions and coordinates.
     """
+    
+    # Orientation configuration for cube models
+    ORIENTATION_CONFIG = {
+        "length_direction": "x_axis",
+        "width_direction": "y_axis",
+        "height_direction": "z_axis", 
+        "description": "Cube with length along X-axis, width along Y-axis, height along Z-axis",
+        "default_orientation": {
+            "pitch": 0.0,
+            "yaw": 0.0,
+            "roll": 0.0
+        }
+    }
+    
     def __init__(self):
-        # Use standardized orientation description from config
-        description = get_orientation_description("cube")
+        description = """Cube model with standardized orientation:
+- Length dimension: X-axis 
+- Width dimension: Y-axis
+- Height dimension: Z-axis
+Centered at specified coordinates with edges aligned to coordinate axes."""
         parameters = {
             "name": {
                 "type": "string",
@@ -64,9 +106,29 @@ class ModelCylinder(ToolIface):
     """
     A tool for creating a cylinder model with specified dimensions and coordinates.
     """
+    
+    # Orientation configuration for cylinder models
+    ORIENTATION_CONFIG = {
+        "axis_direction": "z_axis",
+        "radius_x_direction": "x_axis",
+        "radius_y_direction": "y_axis",
+        "description": "Cylinder with main axis along Z-axis, circular cross-section in X-Y plane",
+        "default_orientation": {
+            "pitch": 0.0,
+            "yaw": 0.0, 
+            "roll": 0.0
+        }
+    }
+    
     def __init__(self):
-        # Use standardized orientation description from config
-        description = get_orientation_description("cylinder")
+        description = """Cylinder model with standardized orientation:
+- Cylinder axis: Z-axis (height direction)
+- Circular cross-section: X-Y plane
+- Radius along X and Y axes can be different for elliptical cylinders
+- X-axis: Primary radius direction
+- Y-axis: Secondary radius direction  
+- Z-axis: Height/length direction
+Centered at specified coordinates."""
         parameters = {
             "name": {
                 "type": "string",
@@ -138,11 +200,30 @@ class ModelCylinder(ToolIface):
 
 class ModelHalfCylinder(ToolIface):
     """
-    A tool for creating a half cylinder model with specified dimensions and coordinates, 在y轴上对称, 正视图为矩形
+    A tool for creating a half cylinder model with specified dimensions and coordinates.
     """
+    
+    # Orientation configuration for half-cylinder models
+    ORIENTATION_CONFIG = {
+        "axis_direction": "z_axis",
+        "radius_x_direction": "x_axis", 
+        "radius_y_direction": "y_axis",
+        "description": "Half-cylinder with main axis along Z-axis, half-circular cross-section in X-Y plane",
+        "default_orientation": {
+            "pitch": 0.0,
+            "yaw": 0.0,
+            "roll": 0.0
+        }
+    }
+    
     def __init__(self):
-        # Use standardized orientation description from config  
-        description = get_orientation_description("half_cylinder")
+        description = """Half-cylinder model with standardized orientation:
+- Cylinder axis: Z-axis (height direction)
+- Half-circular cross-section: X-Y plane (cut along Y-axis)
+- X-axis: Primary radius direction
+- Y-axis: Secondary radius direction (cut plane)
+- Z-axis: Height/length direction
+Centered at specified coordinates with flat face along the Y-axis."""
         parameters = {
             "name": {
                 "type": "string",
@@ -199,9 +280,28 @@ class ModelNACA4(ToolIface):
     A tool for creating a NACA 4-digit airfoil model for wing design.
     Creates a thin airfoil section that can be used to build wing structures.
     """
+    
+    # Orientation configuration for NACA4 airfoil models
+    ORIENTATION_CONFIG = {
+        "chord_direction": "x_axis",
+        "span_direction": "y_axis", 
+        "thickness_direction": "z_axis",
+        "section_normal": "y_axis",
+        "description": "NACA airfoil with chord along X-axis, stackable along Y-axis (span), thickness along Z-axis",
+        "default_orientation": {
+            "pitch": 0.0,  # rotation around X-axis
+            "yaw": 0.0,    # rotation around Y-axis  
+            "roll": 0.0    # rotation around Z-axis
+        }
+    }
+    
     def __init__(self):
-        # Use standardized orientation description from config
-        description = get_orientation_description("naca4")
+        description = """NACA 4-digit airfoil model with standardized orientation:
+- Chord direction: X-axis (leading edge to trailing edge)
+- Span direction: Y-axis (wing spread, stackable along this axis)
+- Thickness direction: Z-axis (airfoil thickness, bottom to top)
+- Section normal: Y-axis direction (perpendicular to airfoil surface)
+At default orientation (0,0,0), the airfoil points along positive X-axis."""
         
         parameters = {
             "name": {

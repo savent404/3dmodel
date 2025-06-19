@@ -1,9 +1,8 @@
 from ai_client import ChatMessage, ChatMessagePrompt, get_ai_client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
-from model_orientation_config import get_coordinate_system_description
 from typing import List, Dict
-from models import ModelCube, ModelCylinder, ModelHalfCylinder, ModelNACA4
+from models import ModelCube, ModelCylinder, ModelHalfCylinder, ModelNACA4, get_coordinate_system_description
 from operations import ModelRigidTransform
 from backend_trimesh import BackendTrimesh as Backend
 import re, os, json
@@ -120,6 +119,10 @@ class Agent:
         try:
             print(f"Parsed response: {data}")
             for item in data:
+                # filter: Object is None, no attributes named `tool`
+                if item is None or item.keys() == [] or 'tool' not in item:
+                    print(f"Skipping item: {item}")
+                    continue
                 # find tool by name
                 tool_name = item.get('tool')
                 tool = next((t for t in self.tools if t.name == tool_name), None)
@@ -148,7 +151,10 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent(tools=gen_tool())
-    user_input = "使用5个airfoil模拟机翼的支撑零件，根据合理的间隔和角度设置每个airfoil的坐标和方向, 并将它们组合成一个整体模型(通过细长的圆柱体贯穿每个airfoil的中心，圆柱体的直径为0.05)"
+    user_input = """
+使用6个airfoil模拟机翼，airfoil沿着y轴方向堆叠。接近x轴的为机翼根部，远离x轴的为机翼尖部。各个airfoil需要调整自身参数以适应这种堆叠方式。
+模型整体呈流线型，，即参数的变化呈现出一种平滑渐变的效果；此之间的后端不能大于间隙的二分之一，确保每个airfoil的前端与下一个airfoil的后端之间有合理的间隔。
+"""
     models, ops = agent.input(user_input)
     print(f"Generated Models: {[model for model in models]}")
     print(f"Generated Operations: {[op for op in ops]}")
