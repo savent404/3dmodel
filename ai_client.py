@@ -3,8 +3,45 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import openai
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
+
+@dataclass
+class TokenUsage:
+    """Token使用统计"""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    
+    def __add__(self, other):
+        """支持token统计累加"""
+        if isinstance(other, TokenUsage):
+            return TokenUsage(
+                prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+                completion_tokens=self.completion_tokens + other.completion_tokens,
+                total_tokens=self.total_tokens + other.total_tokens
+            )
+        return self
+    
+    def to_dict(self):
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens
+        }
+
+@dataclass 
+class ChatResponse:
+    """AI聊天响应，包含内容和token使用量"""
+    content: str
+    token_usage: TokenUsage
+    model: str
+    timestamp: float = None
+    
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = time.time()
 
 class ChatMessagePrompt:
     def get(self) -> str:
@@ -26,15 +63,35 @@ class ChatMessage:
     tool: str = ""
     tool_parameters: Optional[Dict] = None
     model_data: Optional[Dict] = None
+    token_usage: Optional[TokenUsage] = None
 
 
 class BaseAIClient:
     """Base class for AI clients"""
     def __init__(self, system_prompt: str = None):
         self.system_prompt = system_prompt
+        self.total_token_usage = TokenUsage()  # 累计token使用量
+        self.session_history = []  # 存储本次会话的所有调用记录
     
     def chat(self, message: str, conversation: List[ChatMessage]) -> str:
         raise NotImplementedError("Subclasses must implement chat method")
+    
+    def chat_with_usage(self, message: str, conversation: List[ChatMessage]) -> ChatResponse:
+        """返回包含token使用量的响应"""
+        raise NotImplementedError("Subclasses must implement chat_with_usage method")
+    
+    def get_total_usage(self) -> TokenUsage:
+        """获取总的token使用量"""
+        return self.total_token_usage
+    
+    def get_session_history(self) -> List[Dict]:
+        """获取会话历史记录"""
+        return self.session_history
+    
+    def reset_usage_stats(self):
+        """重置token使用统计"""
+        self.total_token_usage = TokenUsage()
+        self.session_history = []
 
 
 class ChatGPTClient(BaseAIClient):
@@ -53,8 +110,15 @@ class ChatGPTClient(BaseAIClient):
         self.client = openai.OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
-        )    
+        )
+        
     def chat(self, message: str, conversation: List[ChatMessage]) -> str:
+        """保持向后兼容的chat方法"""
+        response = self.chat_with_usage(message, conversation)
+        return response.content
+    
+    def chat_with_usage(self, message: str, conversation: List[ChatMessage]) -> ChatResponse:
+        """返回包含token使用量的响应"""
         try:
             m = [{"role": "system", "content": self.system_prompt}]
             for msg in conversation[-self.history_depth:]:
@@ -71,7 +135,34 @@ class ChatGPTClient(BaseAIClient):
                 max_tokens = self.max_tokens,
                 temperature = self.temperature,
             )
-            return rsp.choices[0].message.content.strip()
+            
+            # 提取token使用量信息
+            usage = TokenUsage()
+            if hasattr(rsp, 'usage') and rsp.usage:
+                usage.prompt_tokens = getattr(rsp.usage, 'prompt_tokens', 0)
+                usage.completion_tokens = getattr(rsp.usage, 'completion_tokens', 0)
+                usage.total_tokens = getattr(rsp.usage, 'total_tokens', 0)
+            
+            # 更新总使用量
+            self.total_token_usage = self.total_token_usage + usage
+            
+            # 记录本次调用
+            self.session_history.append({
+                "timestamp": time.time(),
+                "model": self.model,
+                "message_length": len(message),
+                "conversation_length": len(conversation),
+                "usage": usage.to_dict()
+            })
+            
+            response = ChatResponse(
+                content=rsp.choices[0].message.content.strip(),
+                token_usage=usage,
+                model=self.model
+            )
+            
+            return response
+            
         except Exception as e:
             print(f"================= ChatGPTClient Error ==========")
             print(f"Message: \n{message} \nConversation: \n{conversation}")
@@ -94,14 +185,19 @@ class SiliconFlowClient(BaseAIClient):
 
         if not self.api_key:
             raise ValueError("SILICONFLOW_API_KEY environment variable is not set.")
-        
-        # SiliconFlow uses OpenAI-compatible API
+          # SiliconFlow uses OpenAI-compatible API
         self.client = openai.OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
         )
     
     def chat(self, message: str, conversation: List[ChatMessage]) -> str:
+        """保持向后兼容的chat方法"""
+        response = self.chat_with_usage(message, conversation)
+        return response.content
+    
+    def chat_with_usage(self, message: str, conversation: List[ChatMessage]) -> ChatResponse:
+        """返回包含token使用量的响应"""
         try:
             m = [{"role": "system", "content": self.system_prompt}]
             for msg in conversation[-self.history_depth:]:
@@ -118,7 +214,34 @@ class SiliconFlowClient(BaseAIClient):
                 max_tokens = self.max_tokens,
                 temperature = self.temperature,
             )
-            return rsp.choices[0].message.content.strip()
+            
+            # 提取token使用量信息
+            usage = TokenUsage()
+            if hasattr(rsp, 'usage') and rsp.usage:
+                usage.prompt_tokens = getattr(rsp.usage, 'prompt_tokens', 0)
+                usage.completion_tokens = getattr(rsp.usage, 'completion_tokens', 0) 
+                usage.total_tokens = getattr(rsp.usage, 'total_tokens', 0)
+            
+            # 更新总使用量
+            self.total_token_usage = self.total_token_usage + usage
+            
+            # 记录本次调用
+            self.session_history.append({
+                "timestamp": time.time(),
+                "model": self.model,
+                "message_length": len(message),
+                "conversation_length": len(conversation),
+                "usage": usage.to_dict()
+            })
+            
+            response = ChatResponse(
+                content=rsp.choices[0].message.content.strip(),
+                token_usage=usage,
+                model=self.model
+            )
+            
+            return response
+            
         except Exception as e:
             print(f"================= SiliconFlowClient Error =======")
             print(f"Message: \n{message} \nConversation: \n{conversation}")

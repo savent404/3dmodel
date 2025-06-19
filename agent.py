@@ -1,4 +1,4 @@
-from ai_client import ChatMessage, ChatMessagePrompt, get_ai_client
+from ai_client import ChatMessage, ChatMessagePrompt, get_ai_client, TokenUsage
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
 from typing import List, Dict, Optional
@@ -7,6 +7,7 @@ from operations import ModelRigidTransform
 from backend_trimesh import BackendTrimesh as Backend
 import re, os, json
 import hashlib
+import datetime
 
 def gen_tool():
     return [
@@ -22,7 +23,12 @@ class Agent:
         self.tools = tools
         self.client = get_ai_client()
         self.conversation_history = []  # Store full conversation history
-        self.history = []  # Current history for AI client        
+        self.history = []  # Current history for AI client
+        
+        # Token使用统计
+        self.session_token_usage = TokenUsage()  # 当前会话总计
+        self.request_token_history = []  # 每次请求的token使用记录
+        
         # Build system prompt
         self.system_prompt = "You are an aircraft design expert who can use various tools to create and manipulate models. You can use the following tools to create models or perform operations:\n"
         for tool in self.tools:
@@ -73,7 +79,7 @@ class Agent:
             )
             chat_history.append(chat_msg)
         return chat_history
-
+    
     def input(self, user_input: str, use_conversation_cache: bool = False):
         # Add user input to conversation history
         self.add_to_conversation("user", user_input)
@@ -88,21 +94,42 @@ class Agent:
 
         # Create a chat message with the system prompt
         messages = user_input.strip()
+        token_usage = None
 
         if os.path.exists(cache_file):
             print(f"cache matched: {cache_file}")
             with open(cache_file, 'r', encoding='utf-8') as f:
                 response = f.read()
+            # 从缓存加载时，token使用量为0
+            token_usage = TokenUsage()
         else:
             print(f"cache not found, sending request to AI client...")
             # Convert conversation history to ChatMessage objects for AI client
             chat_history = self.build_chat_history()
-            # Send the request to the AI client with conversation history
-            response = self.client.chat(messages, chat_history)
+            # Send the request to the AI client with conversation history and get token usage
+            chat_response = self.client.chat_with_usage(messages, chat_history)
+            response = chat_response.content
+            token_usage = chat_response.token_usage
 
             # cache response to cache file
             with open(cache_file, 'w', encoding='utf-8') as f:
                 f.write(response)
+        
+        # 记录token使用量
+        if token_usage:
+            self.session_token_usage = self.session_token_usage + token_usage
+            self.request_token_history.append({
+                "timestamp": datetime.datetime.now().isoformat(),
+                "user_input": user_input[:100] + "..." if len(user_input) > 100 else user_input,
+                "response_length": len(response),
+                "token_usage": token_usage.to_dict(),
+                "cached": os.path.exists(cache_file) and token_usage.total_tokens == 0
+            })
+            
+            # 打印token使用情况
+            if token_usage.total_tokens > 0:
+                print(f"📊 Token使用: 输入={token_usage.prompt_tokens}, 输出={token_usage.completion_tokens}, 总计={token_usage.total_tokens}")
+                print(f"📈 会话累计: {self.session_token_usage.total_tokens} tokens")
         
         # Add AI response to conversation history
         self.add_to_conversation("assistant", response)
@@ -242,12 +269,71 @@ class Agent:
         summary += f"\nPersistent Models: {list(self.persistent_models.keys())}\n"
         return summary
 
+    def get_token_usage_summary(self) -> str:
+        """获取token使用统计摘要"""
+        if not self.request_token_history:
+            return "No token usage recorded."
+        
+        summary = f"=== Token Usage Summary ===\n"
+        summary += f"Total Requests: {len(self.request_token_history)}\n"
+        summary += f"Session Total: {self.session_token_usage.total_tokens} tokens\n"
+        summary += f"  - Input tokens: {self.session_token_usage.prompt_tokens}\n"
+        summary += f"  - Output tokens: {self.session_token_usage.completion_tokens}\n"
+        
+        # 计算缓存命中率
+        cached_requests = sum(1 for req in self.request_token_history if req.get('cached', False))
+        cache_hit_rate = (cached_requests / len(self.request_token_history)) * 100 if self.request_token_history else 0
+        summary += f"Cache Hit Rate: {cache_hit_rate:.1f}% ({cached_requests}/{len(self.request_token_history)})\n"
+        
+        # 最近5次请求的详情
+        summary += f"\nRecent Requests:\n"
+        recent_requests = self.request_token_history[-5:]
+        for i, req in enumerate(recent_requests, 1):
+            cached_indicator = " [CACHED]" if req.get('cached', False) else ""
+            summary += f"{i}. {req['timestamp'][:19]} - {req['token_usage']['total_tokens']} tokens{cached_indicator}\n"
+            summary += f"   Input: {req['user_input']}\n"
+        
+        return summary
+    
+    def save_token_usage_report(self, filename: str = None):
+        """保存token使用报告到文件"""
+        if filename is None:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"token_usage_report_{timestamp}.json"
+        
+        report = {
+            "session_summary": {
+                "total_requests": len(self.request_token_history),
+                "total_tokens": self.session_token_usage.to_dict(),
+                "cache_hit_rate": sum(1 for req in self.request_token_history if req.get('cached', False)) / len(self.request_token_history) * 100 if self.request_token_history else 0,
+                "report_time": datetime.datetime.now().isoformat()
+            },
+            "detailed_history": self.request_token_history,
+            "ai_client_stats": self.client.get_session_history() if hasattr(self.client, 'get_session_history') else []
+        }
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        
+        print(f"Token usage report saved to: {filename}")
+        return filename
+    
+    def reset_token_stats(self):
+        """重置token统计"""
+        self.session_token_usage = TokenUsage()
+        self.request_token_history = []
+        if hasattr(self.client, 'reset_usage_stats'):
+            self.client.reset_usage_stats()
+        print("Token usage statistics reset.")
+
 def run_cli():
     """Run the CLI frontend for multi-turn conversation with the AI model."""
     print("=== 3D Model Generation CLI ===")
     print("与AI模型进行多轮对话以修正和完善3D模型")
     print("输入 'quit' 或 'exit' 退出")
     print("输入 'history' 查看对话历史")
+    print("输入 'tokens' 查看token使用统计")
+    print("输入 'save-report' 保存token使用报告")
     print("输入 'clear' 清除当前模型并开始新的对话")
     print("=" * 40)
     
@@ -265,13 +351,21 @@ def run_cli():
             
             if not user_input:
                 continue
-                
-            # Handle special commands
+                  # Handle special commands
             if user_input.lower() in ['quit', 'exit', '退出']:
+                # 退出时显示token使用统计
+                print("\n" + agent.get_token_usage_summary())
                 print("感谢使用！再见！")
                 break
             elif user_input.lower() in ['history', '历史']:
                 print("\n" + agent.get_conversation_summary())
+                continue
+            elif user_input.lower() in ['tokens', 'token']:
+                print("\n" + agent.get_token_usage_summary())
+                continue
+            elif user_input.lower() in ['save-report', 'report']:
+                filename = agent.save_token_usage_report()
+                print(f"Token使用报告已保存至: {filename}")
                 continue
             elif user_input.lower() in ['clear', '清除']:
                 # Close current display and reset
@@ -279,8 +373,9 @@ def run_cli():
                 agent.clear_all_models()
                 agent.conversation_history = []
                 agent.history = []
+                agent.reset_token_stats()  # 重置token统计
                 conversation_turn = 0
-                print("已清除当前模型和对话历史，开始新的对话。")
+                print("已清除当前模型、对话历史和token统计，开始新的对话。")
                 continue
             
             # Close previous rendering before processing new request
