@@ -30,3 +30,10 @@ class BackendIface:
         :return: String representation of the rendered model.
         """
         raise NotImplementedError("This method should be implemented by subclasses.")
+    
+    def close_display(self) -> None:
+        """
+        Close any currently open display windows or visualizations.
+        This method should be implemented by subclasses that support interactive displays.
+        """
+        pass

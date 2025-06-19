@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import trimesh
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 class BackendTrimesh(BackendIface):
     def __init__(self, name: str):
@@ -14,6 +15,26 @@ class BackendTrimesh(BackendIface):
         super().__init__(name)
         self.name = name
         self.scene = trimesh.Scene()
+        self.current_viewer = None  # Store reference to current viewer
+    
+    def close_display(self) -> None:
+        """
+        Close any currently open display windows.
+        """
+        try:
+            # Close matplotlib figures
+            plt.close('all')
+            
+            # If we have a viewer reference, close it
+            if self.current_viewer is not None:
+                try:
+                    self.current_viewer.close()
+                except:
+                    pass
+                self.current_viewer = None
+                
+        except Exception as e:
+            print(f"Warning: Could not close display properly: {e}")
     
     def transform(self, model: List[Model], operations: List[ModelOperation]) -> List[Model]:
         """
@@ -57,10 +78,9 @@ class BackendTrimesh(BackendIface):
                 
                 # Add mesh to scene with a unique name
                 self.scene.add_geometry(mesh, node_name=f"{m.name}_{i}")
-        
-        # Show the scene
+          # Show the scene
         try:
-            self.scene.show()
+            self.current_viewer = self.scene.show()
         except Exception as e:
             print(f"Error displaying scene: {e}")
             print("Scene created successfully but display failed. This might be due to missing display dependencies.")
@@ -119,14 +139,14 @@ class BackendTrimesh(BackendIface):
         
         # Create a cylinder using trimesh
         cylinder = trimesh.creation.cylinder(radius=avg_radius, height=height)
-        
-        # Scale to create elliptical cross-section if needed
+          # Scale to create elliptical cross-section if needed
         if abs(radius_x - radius_y) > 1e-6:  # If radii are different
             scale_matrix = np.eye(4)
             scale_matrix[0, 0] = radius_x / avg_radius
             scale_matrix[1, 1] = radius_y / avg_radius
             cylinder.apply_transform(scale_matrix)
-          # Apply transformations
+        
+        # Apply transformations
         transform_matrix = self._get_transform_matrix(model)
         cylinder.apply_transform(transform_matrix)
         
@@ -153,11 +173,12 @@ class BackendTrimesh(BackendIface):
             scale_matrix[0, 0] = radius_x / avg_radius
             scale_matrix[1, 1] = radius_y / avg_radius
             full_cylinder.apply_transform(scale_matrix)
-        
-        # Create a cutting plane to make it half cylinder
-        # Create a box that will cut the cylinder in half
+          # Create a cutting plane to make it half cylinder
+        # Create a box that will cut the cylinder in half (remove one side)
+        # We want to keep the Y >= 0 part and remove the Y < 0 part
         cutting_box = trimesh.creation.box(extents=[radius_x*4, radius_y*2, height*2])
-        cutting_transform = trimesh.transformations.translation_matrix([radius_x, 0, 0])
+        # Move the cutting box so it only covers the Y < 0 region
+        cutting_transform = trimesh.transformations.translation_matrix([0, -radius_y, 0])
         cutting_box.apply_transform(cutting_transform)
         
         try:
@@ -166,7 +187,9 @@ class BackendTrimesh(BackendIface):
         except Exception as e:
             print(f"Warning: Boolean operation failed for half cylinder: {e}")
             # Fallback: return the full cylinder if boolean operation fails
-            half_cylinder = full_cylinder          # Apply transformations
+            half_cylinder = full_cylinder
+            
+        # Apply transformations
         transform_matrix = self._get_transform_matrix(model)
         half_cylinder.apply_transform(transform_matrix)
         
@@ -346,3 +369,55 @@ class BackendTrimesh(BackendIface):
         except Exception as e:
             print(f"Error performing boolean operation {operation}: {e}")
             return mesh1  # Return original mesh if operation fails
+
+import unittest
+from if_model import Model, ModelOperation
+
+class TestBackendTrimesh(unittest.TestCase):
+    def setUp(self):
+        self.backend = BackendTrimesh("test_backend")
+    def test_create_cylinder_with_rotation(self):
+        """Test creating a cylinder mesh with rotation."""
+        raw = Model(
+            type="cylinder",
+            description="A test cylinder with rotation",
+            name="TestCylinderRotated",
+            coord_x=2.0,
+            coord_y=2.0,
+            coord_z=2.0,
+            orientation_pitch=0.0,
+            orientation_yaw=0.0,
+            orientation_roll=0.0,
+            box_size=[1.0, 1.0, 2.0],
+            model_data={"radius_x": 1.0, "radius_y": 1.0, "height": 2.0}
+        )
+        transform_op = ModelOperation(
+            type="transform_rigid",
+            description="Rotate cylinder 45 degrees around X-axis",
+            models=[raw.name],
+            parameters={
+                "translation": [0.0, 0.0, 0.0],
+                "rotation": [45.0, 0.0, 0.0],  # Rotate 45 degrees around X-axis
+                "scale": 1.0
+            }
+        )
+        self.backend.transform([raw], [transform_op])
+        model = Model(
+            type="cylinder",
+            description="A test cylinder with rotation",
+            name="TestCylinderRotated",
+            coord_x=0.0,
+            coord_y=0.0,
+            coord_z=0.0,
+            orientation_pitch=45.0,  # Rotate 45 degrees around X-axis
+            orientation_yaw=0.0,
+            orientation_roll=0.0,
+            box_size=[1.0, 1.0, 2.0],
+            model_data={"radius_x": 1.0, "radius_y": 1.0, "height": 2.0}
+        )
+        mesh = self.backend._create_cylinder_mesh(model)
+        self.backend.scene.add_geometry(mesh)
+        self.backend.render([model, raw])
+
+if __name__ == "__main__":
+    unittest.main()

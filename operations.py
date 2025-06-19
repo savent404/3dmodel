@@ -15,7 +15,7 @@ class ModelRigidTransform(ToolIface):
             parameters={
                 "model": {"type": "string", "description": "The model to be transformed", "required": True},
                 "translation": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "default": [0.0, 0.0, 0.0]},
-                "rotation": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "default": [0.0, 0.0, 0.0]},
+                "rotation": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "default": [0.0, 0.0, 0.0], "description": "Rotation angles in degrees [pitch, yaw, roll]"},
                 "scale": {"type": "number", "default": 1.0}
             },
             tool_type="operation"
@@ -29,7 +29,7 @@ class ModelRigidTransform(ToolIface):
         :param models: List of models to apply the transformation to.
         :param model: The model to be transformed.
         :param translation: Translation vector [tx, ty, tz].
-        :param rotation: Rotation vector [rx, ry, rz] in radians.
+        :param rotation: Rotation vector [rx, ry, rz] in degrees (pitch, yaw, roll).
         :param scale: Scaling factor.
         :return: A ModelOperation object representing the transformation.
         """
