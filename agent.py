@@ -1,6 +1,7 @@
 from ai_client import ChatMessage, ChatMessagePrompt, get_ai_client
 from if_tool import ToolIface
 from if_model import Model, ModelOperation
+from model_orientation_config import get_coordinate_system_description
 from typing import List, Dict
 from models import ModelCube, ModelCylinder, ModelHalfCylinder, ModelNACA4
 from operations import ModelRigidTransform
@@ -21,14 +22,18 @@ class Agent:
     def __init__(self, tools: List[ToolIface]):
         self.tools = tools
         self.client = get_ai_client()
-        self.history = []
-
-        # Build system prompt
+        self.history = []        # Build system prompt
         self.system_prompt = "You are an aircraft design expert who can use various tools to create and manipulate models. You can use the following tools to create models or perform operations:\n"
         for tool in self.tools:
             item = f'- {tool.name}: {tool.to_json()}\n'
             self.system_prompt += item
-        self.system_prompt += "You can also perform operations on models, such as combining them or transforming them."
+        
+        # Add standardized coordinate system information
+        coord_system_desc = get_coordinate_system_description()
+        self.system_prompt += f"\n{coord_system_desc}\n"
+        self.system_prompt += "You can also perform operations on models, such as combining them or transforming them. "
+        self.system_prompt += "When creating models, always follow the standardized orientation constraints defined in each tool's description. "
+        self.system_prompt += "Pay close attention to model orientations to ensure consistency across all created models."
         self.client.system_prompt = f'{self.system_prompt}\n{ChatMessagePrompt().get()}'
 
         self.models = []

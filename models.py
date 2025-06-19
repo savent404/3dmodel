@@ -1,5 +1,6 @@
 from if_tool import ToolIface
 from if_model import Model
+from model_orientation_config import get_orientation_description, get_model_orientation
 
 
 class ModelCube(ToolIface):
@@ -7,7 +8,8 @@ class ModelCube(ToolIface):
     A tool for creating a cube model with specified dimensions and coordinates.
     """
     def __init__(self):
-        description = "Create a cube model, the cube is centered at (0,0,0) with specified width, height, and depth."
+        # Use standardized orientation description from config
+        description = get_orientation_description("cube")
         parameters = {
             "name": {
                 "type": "string",
@@ -63,7 +65,8 @@ class ModelCylinder(ToolIface):
     A tool for creating a cylinder model with specified dimensions and coordinates.
     """
     def __init__(self):
-        description = "Create a cylinder model, the cylinder is centered at (0,0,0) with specified radius and height."
+        # Use standardized orientation description from config
+        description = get_orientation_description("cylinder")
         parameters = {
             "name": {
                 "type": "string",
@@ -138,7 +141,8 @@ class ModelHalfCylinder(ToolIface):
     A tool for creating a half cylinder model with specified dimensions and coordinates, 在y轴上对称, 正视图为矩形
     """
     def __init__(self):
-        description = "Create a half cylinder model, the half cylinder is centered at (0,0,0) with specified radius and height (y轴对称). 正视图为矩形."
+        # Use standardized orientation description from config  
+        description = get_orientation_description("half_cylinder")
         parameters = {
             "name": {
                 "type": "string",
@@ -196,10 +200,9 @@ class ModelNACA4(ToolIface):
     Creates a thin airfoil section that can be used to build wing structures.
     """
     def __init__(self):
-        description = """
-Create a NACA 4-digit airfoil model, useful for wing design. The airfoil is a thin sheet with NACA profile.
-As default, chord direction: X-axis (airfoil points along X-axis), span direction: Y-axis (stackable along Y-axis),  Thickness direction: Z-axis (airfoil thickness along Z-axis), Section normal: Y-axis direction.
-"""
+        # Use standardized orientation description from config
+        description = get_orientation_description("naca4")
+        
         parameters = {
             "name": {
                 "type": "string",

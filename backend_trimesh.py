@@ -166,8 +166,7 @@ class BackendTrimesh(BackendIface):
         except Exception as e:
             print(f"Warning: Boolean operation failed for half cylinder: {e}")
             # Fallback: return the full cylinder if boolean operation fails
-            half_cylinder = full_cylinder        
-        # Apply transformations
+            half_cylinder = full_cylinder          # Apply transformations
         transform_matrix = self._get_transform_matrix(model)
         half_cylinder.apply_transform(transform_matrix)
         
@@ -176,11 +175,13 @@ class BackendTrimesh(BackendIface):
     def _create_naca4_mesh(self, model: Model) -> trimesh.Trimesh:
         """
         Create a NACA 4-digit airfoil mesh from model data.
-        The airfoil is oriented with:
+        
+        Uses standardized orientation from model_orientation_config:
         - Chord direction: X-axis (airfoil points along X-axis)
         - Span direction: Y-axis (stackable along Y-axis)
         - Thickness direction: Z-axis (airfoil thickness along Z-axis)
         - Section normal: Y-axis direction (perpendicular to airfoil surface)
+        
         :param model: Model containing NACA airfoil data.
         :return: Trimesh airfoil object (thin sheet).
         """
